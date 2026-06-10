@@ -5,7 +5,7 @@
 
 ## What it does
 
-llm-scanner probes LLM API endpoints for security vulnerabilities using two complementary frameworks. Garak (NVIDIA) runs a library of ~5500 automated probes across categories like DAN jailbreaks, prompt injection, and spam/toxicity detection. PyRIT (Microsoft) executes targeted red-teaming attack strategies including jailbreak escalation, system prompt leakage, and direct injection. Findings are deduplicated, severity-classified, and output as JSON and Markdown reports — with the CI pipeline exiting 1 when critical vulnerabilities are detected.
+llm-scanner probes LLM API endpoints for security vulnerabilities using two complementary frameworks. Garak (NVIDIA) runs a library of ~5500 automated probes across categories like DAN jailbreaks, prompt injection, and spam/toxicity detection. PyRIT (Microsoft) executes targeted red-teaming attack strategies including jailbreak escalation, system prompt leakage, and direct injection. Findings are deduplicated, severity-classified, and output as JSON and Markdown reports, with the CI pipeline exiting 1 when critical vulnerabilities are detected.
 
 ## Architecture
 
@@ -59,7 +59,7 @@ python scanner/main.py
 
 ## CI/CD
 
-Every push to `master` triggers the GitHub Actions workflow. Unit tests run first in the `test` job — if they fail, the scan is skipped. Once tests pass, the `scan` job starts the vulnerable Flask target, runs the full scanner pipeline against it, and uploads the Markdown report as a workflow artifact. The pipeline exits 1 if critical findings are detected, causing the job to show red in the Actions UI — this is intentional behavior, acting as a hard security gate that blocks merges when critical vulnerabilities exist.
+Every push to `master` triggers the GitHub Actions workflow. Unit tests run first in the `test` job, if they fail, the scan is skipped. Once tests pass, the `scan` job starts the vulnerable Flask target, runs the full scanner pipeline against it, and uploads the Markdown report as a workflow artifact. The pipeline exits 1 if critical findings are detected, causing the job to show red in the Actions UI, this is intentional behavior, acting as a hard security gate that blocks merges when critical vulnerabilities exist.
 
 ## Tech Stack
 

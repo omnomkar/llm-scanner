@@ -1,6 +1,6 @@
 flask
 garak
-pyrit-ai
+pyrit
 pandas
 jinja2
 pytest
