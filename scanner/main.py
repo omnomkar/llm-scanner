@@ -10,7 +10,7 @@ from scanner.pyrit_runner import run_pyrit_probes
 from scanner.reporter import generate_report
 
 TARGET_URL = "http://localhost:5000/chat"
-VENV_PYTHON = "./venv/bin/python"
+VENV_PYTHON = sys.executable
 
 
 def main():
