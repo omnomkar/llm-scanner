@@ -1,12 +1,13 @@
 name: LLM Security Scan
 
 on:
-  workflow_dispatch:
   push:
-    branches: [main]
+    branches: [master]
+  pull_request:
+    branches: [master]
 
 jobs:
-  scan:
+  test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -20,4 +21,40 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: Run tests
-        run: pytest tests/
+        run: pytest tests/test_aggregator.py -v
+
+  scan:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Start vulnerable target
+        run: |
+          python target/app.py &
+          sleep 3
+
+      - name: Run full scan pipeline
+        run: python scanner/main.py
+
+      - name: Upload scan report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: scan-report
+          path: reports/report_*.md
+
+      - name: Check for critical findings
+        run: |
+          if grep -q "🔴 Critical | [^0]" reports/report_*.md; then
+            echo "CRITICAL findings detected — failing pipeline"
+            exit 1
+          fi
