@@ -42,8 +42,8 @@ jobs:
           python target/app.py &
           sleep 3
 
-      - name: Run full scan pipeline
-        run: python scanner/main.py
+      - name: Run scanner pipeline
+        run: python -m scanner.main
 
       - name: Upload scan report
         if: always()
