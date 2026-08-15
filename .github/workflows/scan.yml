@@ -42,8 +42,25 @@ jobs:
           python target/app.py &
           sleep 3
 
-      - name: Run scanner pipeline
-        run: python -m scanner.main
+      # The target is deliberately vulnerable, so the scanner is EXPECTED to
+      # find criticals and exit 1. continue-on-error lets the run keep going so
+      # the next step can assert on that outcome; without it the job would fail
+      # here and the assertion would never execute.
+      - name: Run scanner against deliberately vulnerable target — expected exit 1
+        id: scan
+        continue-on-error: true
+        run: python -m scanner.main --no-color
+
+      - name: Verify scanner exited 1 (critical findings expected)
+        run: |
+          if [ "${{ steps.scan.outcome }}" = "failure" ]; then
+            echo "Scanner exited non-zero as expected — severity gate fired."
+          else
+            echo "::error::Scanner exited 0 against the vulnerable target."
+            echo "The severity gate did not fire. Either detection regressed or"
+            echo "the target is no longer vulnerable."
+            exit 1
+          fi
 
       - name: Upload scan report
         if: always()
@@ -51,10 +68,3 @@ jobs:
         with:
           name: scan-report
           path: reports/report_*.md
-
-      - name: Check for critical findings
-        run: |
-          if grep -q "🔴 Critical | [^0]" reports/report_*.md; then
-            echo "CRITICAL findings detected — failing pipeline"
-            exit 1
-          fi

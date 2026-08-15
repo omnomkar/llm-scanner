@@ -54,6 +54,15 @@ KNOWNBADSIGNATURES_PROBES = [
     "av_spam_scanning.GTphish",
 ]
 
+# Keyed by the garak probe family each list belongs to. Kept as an explicit
+# mapping (rather than deriving it from the probe names) so callers can report
+# "N probes across M families" without re-parsing anything.
+PROBE_FAMILIES = {
+    "dan": DAN_PROBES,
+    "promptinject": PROMPTINJECT_PROBES,
+    "av_spam_scanning": KNOWNBADSIGNATURES_PROBES,
+}
+
 PROBES = DAN_PROBES + PROMPTINJECT_PROBES + KNOWNBADSIGNATURES_PROBES
 
 # Maps a substring found in a probe name to (category, severity).
@@ -82,15 +91,15 @@ DEFAULT_RATIONALE = "Garak's {probe} probe registered a hit (score={score}) agai
 # We hit exactly that during development: a full run consistently died ~20%
 # into dan.DanInTheWild with "Read timed out". It looked like a target-latency
 # problem, but raising this from 10s all the way to 60s did *not* fix it --
-# the real cause turned out to be how the test harness (test_garak.py) was
-# launching the Flask target: it captured the target's stdout/stderr with
-# subprocess.PIPE and never read from the pipe. Flask's debug server logs
-# every request, so the unread 64KB OS pipe buffer filled up and the
-# single-threaded dev server blocked inside write(), hanging for well over a
-# minute -- a classic subprocess deadlock, not a slow-response issue. The
-# actual fix lives in test_garak.py (discarding the target's output instead of
-# capturing it). 60s is kept here regardless as reasonable headroom for a
-# busy single-threaded dev server.
+# the real cause turned out to be how the manual harness (then test_garak.py,
+# now manual_garak_check.py) was launching the Flask target: it captured the
+# target's stdout/stderr with subprocess.PIPE and never read from the pipe.
+# Flask's debug server logs every request, so the unread 64KB OS pipe buffer
+# filled up and the single-threaded dev server blocked inside write(), hanging
+# for well over a minute -- a classic subprocess deadlock, not a slow-response
+# issue. The actual fix lives in manual_garak_check.py (discarding the
+# target's output instead of capturing it). 60s is kept here regardless as
+# reasonable headroom for a busy single-threaded dev server.
 REQUEST_TIMEOUT_SECONDS = 60
 
 
@@ -215,7 +224,12 @@ def _parse_hitlog(hitlog_path):
     return findings
 
 
-def run_garak_probes(target_url, probes=None, report_prefix="findings/garak_scan"):
+def run_garak_probes(
+    target_url,
+    probes=None,
+    report_prefix="findings/garak_scan",
+    stream_progress=True,
+):
     """Run garak's dan / promptinject / knownbadsignatures (av_spam_scanning)
     probes against ``target_url`` (a REST chat endpoint) and return a list of
     findings in the project's common schema.
@@ -233,6 +247,15 @@ def run_garak_probes(target_url, probes=None, report_prefix="findings/garak_scan
         Path prefix (relative to the current working directory, or absolute)
         that garak should write its report/hit-log files under. Defaults to
         ``"findings/garak_scan"``.
+    stream_progress:
+        When True (the default), garak's stderr is inherited from this process
+        instead of being captured, so its per-probe progress bars render live
+        in the terminal while the run is in flight. A full run takes minutes;
+        capturing stderr makes the pipeline look hung. Pass False to capture
+        stderr instead (useful for tests, or any caller that wants the text).
+
+        Note that ``result.stderr`` is ``None`` whenever this is True -- there
+        is nothing to capture, because it already went to the terminal.
 
     Returns
     -------
@@ -265,11 +288,22 @@ def run_garak_probes(target_url, probes=None, report_prefix="findings/garak_scan
         abs_report_prefix,
     ]
 
+    # stdout is always captured (it is quiet, and worth keeping for the failure
+    # diagnostics below). stderr carries garak's progress bars, so by default we
+    # let it through to the terminal rather than swallowing it -- see the
+    # stream_progress docstring above.
     try:
         result = subprocess.run(
             cmd,
-            capture_output=True,
+            stdout=subprocess.PIPE,
+            stderr=None if stream_progress else subprocess.PIPE,
             text=True,
+        )
+
+        streamed_note = (
+            "(stderr was streamed to this terminal above)"
+            if stream_progress
+            else result.stderr
         )
 
         if result.returncode != 0:
@@ -277,7 +311,7 @@ def run_garak_probes(target_url, probes=None, report_prefix="findings/garak_scan
             print("--- stdout ---")
             print(result.stdout)
             print("--- stderr ---")
-            print(result.stderr)
+            print(streamed_note)
 
         hitlog_path = _find_hitlog(abs_report_prefix)
         if hitlog_path is None:
@@ -286,7 +320,7 @@ def run_garak_probes(target_url, probes=None, report_prefix="findings/garak_scan
                 "garak stdout/stderr follow for debugging:"
             )
             print(result.stdout)
-            print(result.stderr)
+            print(streamed_note)
             return []
 
         return _parse_hitlog(hitlog_path)

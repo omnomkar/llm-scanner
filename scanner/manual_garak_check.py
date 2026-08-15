@@ -1,5 +1,11 @@
 """Standalone end-to-end check for scanner.garak_runner.
 
+This is a manual developer script, NOT a pytest module -- it contains no test
+functions and is intended to be run by hand. It is deliberately named
+`manual_garak_check.py` rather than `test_garak.py` so that pytest's default
+`test_*.py` collection rules ignore it; the automated test suite lives in
+tests/.
+
 Starts the deliberately vulnerable Flask target, runs garak's dan /
 promptinject / av_spam_scanning (knownbadsignatures) probes against it via
 run_garak_probes(), and prints out what came back so we can confirm the
@@ -8,7 +14,7 @@ findings match the project's common schema.
 Usage (from the project root, with the venv active or not -- this script
 re-execs the target under the venv python explicitly):
 
-    ./venv/bin/python scanner/test_garak.py
+    ./venv/bin/python scanner/manual_garak_check.py
 """
 
 import json

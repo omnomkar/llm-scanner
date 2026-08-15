@@ -1,5 +1,16 @@
 #!/usr/bin/env python3
-"""Standalone integration test: spins up the Flask target and runs PyRIT probes."""
+"""Standalone integration check: spins up the Flask target and runs PyRIT probes.
+
+This is a manual developer script, NOT a pytest module -- it contains no test
+functions and is intended to be run by hand. It is deliberately named
+`manual_pyrit_check.py` rather than `test_pyrit.py` so that pytest's default
+`test_*.py` collection rules ignore it; the automated test suite lives in
+tests/.
+
+Usage (from the project root):
+
+    ./venv/bin/python scanner/manual_pyrit_check.py
+"""
 
 import json
 import subprocess

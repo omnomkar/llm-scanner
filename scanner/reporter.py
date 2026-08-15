@@ -4,11 +4,11 @@ import json
 import os
 from datetime import datetime
 
-_SEVERITY_EMOJI = {
-    "critical": "🔴 Critical",
-    "high": "🟠 High",
-    "medium": "🟡 Medium",
-    "low": "🟢 Low",
+_SEVERITY_LABEL = {
+    "critical": "Critical",
+    "high": "High",
+    "medium": "Medium",
+    "low": "Low",
 }
 
 _CATEGORY_LABEL = {
@@ -50,7 +50,7 @@ def generate_report(aggregated):
     lines.append("| Severity | Count |")
     lines.append("|----------|-------|")
     for key in ("critical", "high", "medium", "low"):
-        lines.append(f"| {_SEVERITY_EMOJI[key]} | {meta[key]} |")
+        lines.append(f"| {_SEVERITY_LABEL[key]} | {meta[key]} |")
     lines.append("")
     lines.append("## Category Breakdown")
     lines.append("| Category | Count |")

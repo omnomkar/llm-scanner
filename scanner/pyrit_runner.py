@@ -1,10 +1,17 @@
-# PyRIT 0.14.0 API audit (2026-06-10):
-#   pyrit.orchestrator.RedTeamingOrchestrator — module does not exist in 0.14.0
+# PyRIT API audit (re-verified 2026-08-15 against the installed pyrit 0.13.0):
+#   pyrit.orchestrator.RedTeamingOrchestrator — module `pyrit.orchestrator` does
+#                                               not exist
 #   pyrit.prompt_target.HTTPTarget          — imports but requires CentralMemory
 #                                             infrastructure setup before instantiation
-#   pyrit.models.PromptRequestPiece         — class removed in 0.14.0
-# All HTTP calls are made with the `requests` library. Findings are labelled
-# source="pyrit" to indicate this is the PyRIT integration layer.
+#   pyrit.models.PromptRequestPiece         — class removed
+#
+# Standing up PyRIT's memory/orchestrator infrastructure just to send four
+# categories of HTTP POST was not worth the dependency weight, so this module
+# implements PyRIT's documented attack categories directly over the target's
+# HTTP API. All HTTP calls are made with the `requests` library and pyrit is
+# NOT a dependency of this project. Findings are labelled source="pyrit" to
+# mark them as the red-teaming attack layer (as opposed to garak's automated
+# probes).
 
 import re
 import uuid

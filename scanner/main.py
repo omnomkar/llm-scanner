@@ -1,19 +1,58 @@
 """Full pipeline: start Flask target, run garak + pyrit probes, aggregate, report."""
 
+import argparse
 import subprocess
 import sys
 import time
 
+from scanner import console
 from scanner.aggregator import aggregate_findings
-from scanner.garak_runner import run_garak_probes
+from scanner.garak_runner import PROBE_FAMILIES, PROBES, run_garak_probes
 from scanner.pyrit_runner import run_pyrit_probes
 from scanner.reporter import generate_report
 
 TARGET_URL = "http://localhost:5000/chat"
 VENV_PYTHON = sys.executable
 
+# How long to give the Flask target to bind its port before probing starts.
+TARGET_BOOT_SECONDS = 2
 
-def main():
+
+def parse_args(argv=None):
+    parser = argparse.ArgumentParser(
+        prog="scanner",
+        description=(
+            "Probe an LLM endpoint for jailbreaks, prompt injection and data "
+            "leakage. Exits 1 when any critical finding is detected."
+        ),
+    )
+    parser.add_argument(
+        "--no-color",
+        action="store_true",
+        help=(
+            "Disable ANSI colour in console output. Colour is also disabled "
+            "automatically when stdout is not a TTY or NO_COLOR is set."
+        ),
+    )
+    parser.add_argument(
+        "--max-rows",
+        type=int,
+        default=25,
+        metavar="N",
+        help=(
+            "Maximum findings to print in the console table (default: 25; "
+            "use 0 for all). Every finding always appears in the reports."
+        ),
+    )
+    return parser.parse_args(argv)
+
+
+def main(argv=None):
+    args = parse_args(argv)
+    console.configure(no_color=args.no_color)
+
+    console.phase_start("Starting vulnerable target...")
+    target_started = time.monotonic()
     flask_proc = subprocess.Popen(
         [VENV_PYTHON, "target/app.py"],
         stdout=subprocess.DEVNULL,
@@ -21,24 +60,48 @@ def main():
     )
 
     try:
-        time.sleep(2)
+        time.sleep(TARGET_BOOT_SECONDS)
+        console.note(
+            f"target listening at {TARGET_URL} "
+            f"({console.format_duration(time.monotonic() - target_started)})"
+        )
 
+        console.phase_start(
+            f"Running garak probes ({len(PROBES)} probes across "
+            f"{len(PROBE_FAMILIES)} families)..."
+        )
+        garak_started = time.monotonic()
         garak_findings = run_garak_probes(TARGET_URL)
-        pyrit_findings = run_pyrit_probes(TARGET_URL)
+        console.phase_done(
+            "garak", len(garak_findings), time.monotonic() - garak_started
+        )
 
+        console.phase_start("Running PyRIT-style attack probes...")
+        pyrit_started = time.monotonic()
+        pyrit_findings = run_pyrit_probes(TARGET_URL)
+        console.phase_done(
+            "pyrit", len(pyrit_findings), time.monotonic() - pyrit_started
+        )
+
+        console.phase_start("Aggregating and writing reports...")
         all_findings = garak_findings + pyrit_findings
         aggregated = aggregate_findings(all_findings)
         paths = generate_report(aggregated)
 
         meta = aggregated["meta"]
-        print("Scan complete.")
-        print(f"Total findings: {meta['total']}")
-        print(
-            f"Critical: {meta['critical']} | High: {meta['high']} | "
-            f"Medium: {meta['medium']} | Low: {meta['low']}"
+        console.note(
+            f"{len(all_findings)} raw findings deduplicated to {meta['total']}"
         )
-        print(f"Report: {paths['md']}")
-        print(f"JSON: {paths['json']}")
+
+        console.findings_table(
+            aggregated["findings"],
+            max_rows=args.max_rows,
+            more_hint=paths["md"],
+        )
+        console.summary_block(meta)
+        console.source_breakdown(meta)
+        console.report_paths(paths)
+        console.gate_line(meta["critical"])
 
         sys.exit(1 if meta["critical"] > 0 else 0)
 
