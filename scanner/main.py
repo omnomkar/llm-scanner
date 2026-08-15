@@ -44,6 +44,24 @@ def parse_args(argv=None):
             "use 0 for all). Every finding always appears in the reports."
         ),
     )
+    parser.add_argument(
+        "--no-target",
+        action="store_true",
+        help=(
+            "Do not start (or stop) the Flask target; attach to one that is "
+            "already listening at the target URL. Use this when something "
+            "else owns the target's lifecycle, such as CI."
+        ),
+    )
+    parser.add_argument(
+        "--verbose",
+        action="store_true",
+        help=(
+            "Print every non-hit attack probe with its prompt and the "
+            "target's response. Off by default. Transport errors are always "
+            "printed regardless of this flag."
+        ),
+    )
     return parser.parse_args(argv)
 
 
@@ -51,20 +69,29 @@ def main(argv=None):
     args = parse_args(argv)
     console.configure(no_color=args.no_color)
 
-    console.phase_start("Starting vulnerable target...")
+    # None means we did not start the target and must not shut it down either.
+    flask_proc = None
     target_started = time.monotonic()
-    flask_proc = subprocess.Popen(
-        [VENV_PYTHON, "target/app.py"],
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-    )
+
+    if args.no_target:
+        console.phase_start("Attaching to already-running target...")
+    else:
+        console.phase_start("Starting vulnerable target...")
+        flask_proc = subprocess.Popen(
+            [VENV_PYTHON, "target/app.py"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
 
     try:
-        time.sleep(TARGET_BOOT_SECONDS)
-        console.note(
-            f"target listening at {TARGET_URL} "
-            f"({console.format_duration(time.monotonic() - target_started)})"
-        )
+        if flask_proc is None:
+            console.note(f"using existing target at {TARGET_URL}")
+        else:
+            time.sleep(TARGET_BOOT_SECONDS)
+            console.note(
+                f"target listening at {TARGET_URL} "
+                f"({console.format_duration(time.monotonic() - target_started)})"
+            )
 
         console.phase_start(
             f"Running garak probes ({len(PROBES)} probes across "
@@ -78,7 +105,7 @@ def main(argv=None):
 
         console.phase_start("Running PyRIT-style attack probes...")
         pyrit_started = time.monotonic()
-        pyrit_findings = run_pyrit_probes(TARGET_URL)
+        pyrit_findings = run_pyrit_probes(TARGET_URL, verbose=args.verbose)
         console.phase_done(
             "pyrit", len(pyrit_findings), time.monotonic() - pyrit_started
         )
@@ -106,11 +133,14 @@ def main(argv=None):
         sys.exit(1 if meta["critical"] > 0 else 0)
 
     finally:
-        flask_proc.terminate()
-        try:
-            flask_proc.wait(timeout=5)
-        except subprocess.TimeoutExpired:
-            flask_proc.kill()
+        # Only tear down a target this process started; under --no-target the
+        # caller owns it.
+        if flask_proc is not None:
+            flask_proc.terminate()
+            try:
+                flask_proc.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                flask_proc.kill()
 
 
 if __name__ == "__main__":

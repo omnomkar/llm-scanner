@@ -49,7 +49,11 @@ jobs:
       - name: Run scanner against deliberately vulnerable target — expected exit 1
         id: scan
         continue-on-error: true
-        run: python -m scanner.main --no-color
+        # --no-target: the step above already owns the target process. Without
+        # it the scanner starts a second one, whose bind to port 5000 fails
+        # silently (its output goes to DEVNULL), so the run only worked by
+        # falling back on the first process.
+        run: python -m scanner.main --no-color --no-target
 
       - name: Verify scanner exited 1 (critical findings expected)
         run: |

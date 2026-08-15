@@ -77,6 +77,8 @@ Options:
 |---|---|
 | `--no-color` | Disable ANSI colour. Also disabled automatically when stdout is not a TTY, or when `NO_COLOR` is set. |
 | `--max-rows N` | Cap the console findings table at `N` rows (default 25; `0` prints all). Every finding always appears in full in the reports. |
+| `--no-target` | Attach to a target already listening at the target URL instead of starting (and stopping) one. Used by CI, which owns the target process itself. |
+| `--verbose` | Print every non-hit attack probe with its prompt and the target's response. Off by default; transport errors print either way. |
 
 The scanner exits 1 when any critical finding is detected, 0 otherwise.
 

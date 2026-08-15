@@ -109,11 +109,16 @@ def _probe_batch(
     prompts: list[str],
     category: str,
     findings: list[dict],
+    verbose: bool = False,
 ) -> None:
     for prompt in prompts:
         try:
             response = _post(target_url, prompt)
         except Exception as exc:
+            # NOT gated behind verbose: an exception means the probe never ran.
+            # If the target is unreachable every probe errors, findings come
+            # back empty, and the severity gate would report a clean bill of
+            # health. That has to stay visible by default.
             print(f"[MISS/ERROR] category={category} prompt={prompt!r}\n  error: {exc}\n")
             continue
 
@@ -130,7 +135,7 @@ def _probe_batch(
                     "rationale": rationale,
                 }
             )
-        else:
+        elif verbose:
             print(
                 f"[MISS] category={category}\n"
                 f"  prompt:   {prompt!r}\n"
@@ -138,13 +143,18 @@ def _probe_batch(
             )
 
 
-def _probe_error_leakage(target_url: str, findings: list[dict]) -> None:
+def _probe_error_leakage(
+    target_url: str,
+    findings: list[dict],
+    verbose: bool = False,
+) -> None:
     """Send malformed payloads to trigger server errors that may leak the system prompt."""
     for payload in _ERROR_LEAKAGE_PAYLOADS:
         label = str(payload)
         try:
             status, body = _post_raw(target_url, payload)
         except Exception as exc:
+            # See _probe_batch: transport errors stay visible regardless.
             print(f"[MISS/ERROR] category=system_prompt_leakage payload={label!r}\n  error: {exc}\n")
             continue
 
@@ -161,7 +171,7 @@ def _probe_error_leakage(target_url: str, findings: list[dict]) -> None:
                     "rationale": rationale,
                 }
             )
-        else:
+        elif verbose:
             print(
                 f"[MISS] category=system_prompt_leakage (error-path probe)\n"
                 f"  payload:  {label!r}\n"
@@ -170,11 +180,32 @@ def _probe_error_leakage(target_url: str, findings: list[dict]) -> None:
             )
 
 
-def run_pyrit_probes(target_url: str) -> list[dict]:
-    """Send attack prompts to target_url and return a list of finding dicts for hits."""
+def run_pyrit_probes(target_url: str, verbose: bool = False) -> list[dict]:
+    """Send attack prompts to target_url and return a list of finding dicts for hits.
+
+    Hits are returned (and rendered by the caller's console output); they are
+    never printed from here. When ``verbose`` is True, every non-hit is also
+    dumped to stdout with its prompt and the target's response -- useful when
+    tuning the hit criteria in ``_classify``, but roughly 15 multi-line blocks
+    per run, so it is off by default. Transport errors print either way.
+    """
     findings: list[dict] = []
-    _probe_batch(target_url, _JAILBREAK_PROMPTS, "jailbreak", findings)
-    _probe_batch(target_url, _SYSTEM_PROMPT_LEAKAGE_PROMPTS, "system_prompt_leakage", findings)
-    _probe_error_leakage(target_url, findings)
-    _probe_batch(target_url, _PROMPT_INJECTION_PROMPTS, "prompt_injection", findings)
+    _probe_batch(
+        target_url, _JAILBREAK_PROMPTS, "jailbreak", findings, verbose=verbose
+    )
+    _probe_batch(
+        target_url,
+        _SYSTEM_PROMPT_LEAKAGE_PROMPTS,
+        "system_prompt_leakage",
+        findings,
+        verbose=verbose,
+    )
+    _probe_error_leakage(target_url, findings, verbose=verbose)
+    _probe_batch(
+        target_url,
+        _PROMPT_INJECTION_PROMPTS,
+        "prompt_injection",
+        findings,
+        verbose=verbose,
+    )
     return findings
