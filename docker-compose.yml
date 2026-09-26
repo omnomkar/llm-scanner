@@ -1,0 +1,11 @@
+# Vector store for the RAG target (target/rag_app.py). Not used by the mock
+# target or by CI.
+services:
+  pgvector:
+    image: pgvector/pgvector:pg16
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: rag
+      POSTGRES_PASSWORD: rag
+      POSTGRES_DB: rag
