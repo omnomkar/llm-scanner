@@ -15,6 +15,7 @@ consequences worth keeping in mind when editing:
 import os
 import sys
 
+from scanner.aggregator import SEVERITY_BY_CATEGORY as _SEVERITY
 from scanner.aggregator import _SEVERITY_RANK, _SOURCE_RANK
 from scanner.reporter import _CATEGORY_LABEL
 
@@ -257,6 +258,31 @@ def source_breakdown(meta):
     # pyrit before garak, matching the aggregator's ordering.
     for name in sorted(sources, key=lambda n: _SOURCE_RANK.get(n, 1)):
         _flush(f"  {name.ljust(label_width)}  {str(sources[name]).rjust(count_width)}")
+
+
+def hit_rates(stats):
+    """Print hits / attempts per category from raw probe counts.
+
+    Unlike the findings table, these counts are taken before deduplication, so
+    with ``--repeat N`` a prompt that hit on 3 of 5 sends contributes 3 hits.
+    Errored probes are excluded from attempts and reported separately.
+    """
+    if not stats:
+        return
+
+    label_width = max(len(_CATEGORY_LABEL.get(c, c)) for c in stats)
+
+    _flush()
+    _flush(_wrap("Hit rate", _BOLD))
+    for category, counts in stats.items():
+        label = _CATEGORY_LABEL.get(category, category).ljust(label_width)
+        attempts = counts["hits"] + counts["misses"]
+        pct = f"{100 * counts['hits'] / attempts:5.1f}%" if attempts else "    -"
+        line = f"  {label}  {counts['hits']:>3} / {attempts:<3}  {pct}"
+        if counts["errors"]:
+            line += f"  ({counts['errors']} errored)"
+        severity = _SEVERITY.get(category, "low") if counts["hits"] else None
+        _flush(severity_color(line, severity) if severity else line)
 
 
 def report_paths(paths):

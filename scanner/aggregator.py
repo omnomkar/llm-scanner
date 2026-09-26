@@ -8,6 +8,8 @@ SEVERITY_BY_CATEGORY = {
     "data_leakage": "high",
     "indirect_injection": "medium",
     "toxicity": "low",
+    "indirect_prompt_injection": "critical",
+    "rag_data_leakage": "critical",
 }
 
 _SEVERITY_RANK = {"critical": 0, "high": 1, "medium": 2, "low": 3}
@@ -20,6 +22,8 @@ CATEGORIES = [
     "data_leakage",
     "indirect_injection",
     "toxicity",
+    "indirect_prompt_injection",
+    "rag_data_leakage",
 ]
 
 

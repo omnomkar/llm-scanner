@@ -18,6 +18,9 @@ _CATEGORY_LABEL = {
     "data_leakage": "Data Leakage",
     "indirect_injection": "Indirect Injection",
     "toxicity": "Toxicity",
+    # Kept within console.py's 21-char category column.
+    "indirect_prompt_injection": "RAG Indirect Inject.",
+    "rag_data_leakage": "RAG Data Leakage",
 }
 
 
